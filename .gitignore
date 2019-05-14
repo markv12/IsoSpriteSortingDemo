@@ -1,0 +1,16 @@
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/Assets/AssetStoreTools*
+
+# Visual Studio 2015 cache directory
+/.vs/
+
+desktop.ini
+desktop.ini.meta
+*.sln
+*.csproj
+SwitchIL2CPPCache
+SwitchIL2CPPStats
