@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -8,25 +9,38 @@ public class IsoSpriteSorting : MonoBehaviour
     public bool renderBelowAll;
 
     [NonSerialized]
+    public bool registered = false;
+    [NonSerialized]
     public bool forceSort;
 
     [NonSerialized]
-    public List<IsoSpriteSorting> staticDependencies = new List<IsoSpriteSorting>(16);
+    public readonly List<IsoSpriteSorting> staticDependencies = new List<IsoSpriteSorting>(16);
     [NonSerialized]
-    public List<IsoSpriteSorting> inverseStaticDependencies = new List<IsoSpriteSorting>(16);
-    public List<IsoSpriteSorting> movingDependencies = new List<IsoSpriteSorting>(8);
+    public readonly List<IsoSpriteSorting> inverseStaticDependencies = new List<IsoSpriteSorting>(16);
+    [NonSerialized]
+    public readonly List<IsoSpriteSorting> movingDependencies = new List<IsoSpriteSorting>(8);
 
     private readonly List<IsoSpriteSorting> visibleStaticDependencies = new List<IsoSpriteSorting>(16);
-    private List<IsoSpriteSorting> activeDependencies = new List<IsoSpriteSorting>(16);
-    public List<IsoSpriteSorting> ActiveDependencies
+
+    private int visibleStaticLastRefreshFrame = 0;
+    public List<IsoSpriteSorting> VisibleStaticDependencies
     {
         get
         {
-            activeDependencies.Clear();
-            IsoSpriteSortingManager.FilterListByVisibility(staticDependencies, visibleStaticDependencies);
-            activeDependencies.AddRange(visibleStaticDependencies);
-            activeDependencies.AddRange(movingDependencies);
-            return activeDependencies;
+            if (visibleStaticLastRefreshFrame < Time.frameCount)
+            {
+                IsoSpriteSortingManager.FilterListByVisibility(staticDependencies, visibleStaticDependencies);
+                visibleStaticLastRefreshFrame = Time.frameCount;
+            }
+            return visibleStaticDependencies;
+        }
+    }
+
+    public List<IsoSpriteSorting> VisibleMovingDependencies
+    {
+        get
+        {
+            return movingDependencies;
         }
     }
 
@@ -40,21 +54,67 @@ public class IsoSpriteSorting : MonoBehaviour
 
     public Vector3 SorterPositionOffset = new Vector3();
     public Vector3 SorterPositionOffset2 = new Vector3();
+    public Renderer[] renderersToSort;
 
     private Transform t;
 
+    public void SetupStaticCache()
+    {
+        RefreshBounds();
+        RefreshPoint1();
+        RefreshPoint2();
+    }
+
+    private void RefreshBounds()
+    {
+        cachedBounds = new Bounds2D(renderersToSort[0].bounds);
+    }
+
+    private void RefreshPoint1()
+    {
+        cachedPoint1 = SorterPositionOffset + t.position;
+    }
+
+    private void RefreshPoint2()
+    {
+        cachedPoint2 = SorterPositionOffset2 + t.position;
+    }
+
+    private int lastPoint1CalculatedFrame;
+    private Vector2 cachedPoint1;
     private Vector3 SortingPoint1
     {
         get
         {
-            return SorterPositionOffset + t.position;
+            if (isMovable)
+            {
+                int frameCount = Time.frameCount;
+                if (frameCount != lastPoint1CalculatedFrame)
+                {
+                    lastPoint1CalculatedFrame = frameCount;
+                    RefreshPoint1();
+                }
+            }
+            return cachedPoint1;
         }
     }
+
+    private int lastPoint2CalculatedFrame;
+    private Vector2 cachedPoint2;
     private Vector3 SortingPoint2
     {
         get
         {
-            return SorterPositionOffset2 + t.position;
+            if (isMovable)
+            {
+                int frameCount = Time.frameCount;
+                if (frameCount != lastPoint2CalculatedFrame)
+                {
+                    lastPoint2CalculatedFrame = frameCount;
+                    RefreshPoint2();
+                }
+            }
+            return cachedPoint2;
         }
     }
 
@@ -66,20 +126,6 @@ public class IsoSpriteSorting : MonoBehaviour
                 return ((SortingPoint1 + SortingPoint2) / 2);
             else
                 return SortingPoint1;
-        }
-    }
-
-    public bool IsNear(Vector3 point, float distance)
-    {
-        if (sortType == SortType.Point)
-        {
-            return Vector2.Distance(point, SortingPoint1) <= distance;
-        }
-        else
-        {
-            bool nearPoint1 = Vector2.Distance(point, SortingPoint1) <= distance;
-            bool nearPoint2 = Vector2.Distance(point, SortingPoint2) <= distance;
-            return nearPoint1 || nearPoint2;
         }
     }
 
@@ -99,8 +145,6 @@ public class IsoSpriteSorting : MonoBehaviour
         }
     }
 
-    public Renderer[] renderersToSort;
-
 #if UNITY_EDITOR
     public void SortScene()
     {
@@ -118,27 +162,28 @@ public class IsoSpriteSorting : MonoBehaviour
     }
 #endif
 
-    void Awake()
+    private void Awake()
+    {
+        t = transform; //This needs to be here AND in the setup function
+    }
+
+    IEnumerator Start()
     {
         if (Application.isPlaying)
         {
             IsoSpriteSortingManager temp = IsoSpriteSortingManager.Instance; //bring the instance into existence so the Update function will run;
+            yield return null;
             Setup();
         }
     }
 
     private void Setup()
     {
-        t = transform;
+        t = transform;  //This needs to be here AND in the Awake function
         if (renderersToSort == null || renderersToSort.Length == 0)
         {
-            renderersToSort = new Renderer[] { GetComponent<Renderer>() };
+            renderersToSort = GetComponentsInChildren<Renderer>();
         }
-        if (!isMovable)
-        {
-            cachedBounds = new Bounds2D(renderersToSort[0].bounds);
-        }
-        System.Array.Sort(renderersToSort, (a, b) => a.sortingOrder.CompareTo(b.sortingOrder));
         IsoSpriteSortingManager.RegisterSprite(this);
     }
 
@@ -149,10 +194,12 @@ public class IsoSpriteSorting : MonoBehaviour
         return y2.CompareTo(y1);
     }
 
+    //A result of -1 means sprite1 is above sprite2 in physical space
     public static int CompareIsoSorters(IsoSpriteSorting sprite1, IsoSpriteSorting sprite2)
     {
         if (sprite1.sortType == SortType.Point && sprite2.sortType == SortType.Point)
         {
+            //Debug.Log(sprite1.name + " - " + sprite1.SortingPoint1 + " sprite2: " + sprite2.name + " - " + sprite2.SortingPoint1);
             return sprite2.SortingPoint1.y.CompareTo(sprite1.SortingPoint1.y);
         }
         else if (sprite1.sortType == SortType.Line && sprite2.sortType == SortType.Line)
@@ -183,7 +230,7 @@ public class IsoSpriteSorting : MonoBehaviour
         int comp1 = ComparePointAndLine(line1Point1, line2);
         int comp2 = ComparePointAndLine(line1Point2, line2);
         int oneVStwo = int.MinValue;
-        if (comp1 == comp2)
+        if (comp1 == comp2) //Both points in line 1 are above or below line2
         {
             oneVStwo = comp1;
         }
@@ -191,14 +238,14 @@ public class IsoSpriteSorting : MonoBehaviour
         int comp3 = ComparePointAndLine(line2Point1, line1);
         int comp4 = ComparePointAndLine(line2Point2, line1);
         int twoVSone = int.MinValue;
-        if (comp3 == comp4)
+        if (comp3 == comp4) //Both points in line 2 are above or below line1
         {
             twoVSone = -comp3;
         }
 
         if (oneVStwo != int.MinValue && twoVSone != int.MinValue)
         {
-            if (oneVStwo == twoVSone)
+            if (oneVStwo == twoVSone) //the two comparisons agree about the ordering
             {
                 return oneVStwo;
             }
@@ -274,18 +321,21 @@ public class IsoSpriteSorting : MonoBehaviour
     }
 
     private Bounds2D cachedBounds;
+    private int lastBoundsCalculatedFrame = 0;
     public Bounds2D TheBounds
     {
         get
         {
             if (isMovable)
             {
-                return new Bounds2D(renderersToSort[0].bounds);
+                int frameCount = Time.frameCount;
+                if (frameCount != lastBoundsCalculatedFrame)
+                {
+                    lastBoundsCalculatedFrame = frameCount;
+                    RefreshBounds();
+                }
             }
-            else
-            {
-                return cachedBounds;
-            }
+            return cachedBounds;
         }
     }
 

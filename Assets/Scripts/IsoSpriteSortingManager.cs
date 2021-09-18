@@ -2,32 +2,38 @@
 
 public class IsoSpriteSortingManager : Singleton<IsoSpriteSortingManager>
 {
-    private static List<IsoSpriteSorting> floorSpriteList = new List<IsoSpriteSorting>(64);
-    private static List<IsoSpriteSorting> staticSpriteList = new List<IsoSpriteSorting>(256);
-    private static List<IsoSpriteSorting> currentlyVisibleStaticSpriteList = new List<IsoSpriteSorting>();
+    private static readonly List<IsoSpriteSorting> floorSpriteList = new List<IsoSpriteSorting>(64);
+    private static readonly List<IsoSpriteSorting> staticSpriteList = new List<IsoSpriteSorting>(256);
+    private static readonly List<IsoSpriteSorting> currentlyVisibleStaticSpriteList = new List<IsoSpriteSorting>();
 
-    private static List<IsoSpriteSorting> moveableSpriteList = new List<IsoSpriteSorting>(64);
-    private static List<IsoSpriteSorting> currentlyVisibleMoveableSpriteList = new List<IsoSpriteSorting>();
+    private static readonly List<IsoSpriteSorting> moveableSpriteList = new List<IsoSpriteSorting>(64);
+    private static readonly List<IsoSpriteSorting> currentlyVisibleMoveableSpriteList = new List<IsoSpriteSorting>();
 
     public static void RegisterSprite(IsoSpriteSorting newSprite)
     {
-        if (newSprite.renderBelowAll)
+        if (!newSprite.registered)
         {
-            floorSpriteList.Add(newSprite);
-            SortListSimple(floorSpriteList);
-            SetSortOrderNegative(floorSpriteList);
-        }
-        else
-        {
-            if (newSprite.isMovable)
+            if (newSprite.renderBelowAll)
             {
-                moveableSpriteList.Add(newSprite);
+                floorSpriteList.Add(newSprite);
+                SortListSimple(floorSpriteList);
+                SetSortOrderNegative(floorSpriteList);
             }
             else
             {
-                staticSpriteList.Add(newSprite);
-                SetupStaticDependencies(newSprite);
+                if (newSprite.isMovable)
+                {
+                    moveableSpriteList.Add(newSprite);
+                }
+                else
+                {
+
+                    staticSpriteList.Add(newSprite);
+                    newSprite.SetupStaticCache();
+                    SetupStaticDependencies(newSprite);
+                }
             }
+            newSprite.registered = true;
         }
     }
 
@@ -40,6 +46,7 @@ public class IsoSpriteSortingManager : Singleton<IsoSpriteSortingManager>
             if (CalculateBoundsIntersection(newSprite, otherSprite))
             {
                 int compareResult = IsoSpriteSorting.CompareIsoSorters(newSprite, otherSprite);
+                //Debug.Log("Compared: " + newSprite.gameObject.name + " other: " + otherSprite.gameObject.name + " result: " + compareResult);
                 if (compareResult == -1)
                 {
                     otherSprite.staticDependencies.Add(newSprite);
@@ -56,21 +63,25 @@ public class IsoSpriteSortingManager : Singleton<IsoSpriteSortingManager>
 
     public static void UnregisterSprite(IsoSpriteSorting spriteToRemove)
     {
-        if (spriteToRemove.renderBelowAll)
+        if (spriteToRemove.registered)
         {
-            floorSpriteList.Remove(spriteToRemove);
-        }
-        else
-        {
-            if (spriteToRemove.isMovable)
+            if (spriteToRemove.renderBelowAll)
             {
-                moveableSpriteList.Remove(spriteToRemove);
+                floorSpriteList.Remove(spriteToRemove);
             }
             else
             {
-                staticSpriteList.Remove(spriteToRemove);
-                RemoveStaticDependencies(spriteToRemove);
+                if (spriteToRemove.isMovable)
+                {
+                    moveableSpriteList.Remove(spriteToRemove);
+                }
+                else
+                {
+                    staticSpriteList.Remove(spriteToRemove);
+                    RemoveStaticDependencies(spriteToRemove);
+                }
             }
+            spriteToRemove.registered = false;
         }
     }
 
@@ -81,6 +92,8 @@ public class IsoSpriteSortingManager : Singleton<IsoSpriteSortingManager>
             IsoSpriteSorting otherSprite = spriteToRemove.inverseStaticDependencies[i];
             otherSprite.staticDependencies.Remove(spriteToRemove);
         }
+        spriteToRemove.inverseStaticDependencies.Clear();
+        spriteToRemove.staticDependencies.Clear();
     }
 
     void Update()
@@ -88,7 +101,7 @@ public class IsoSpriteSortingManager : Singleton<IsoSpriteSortingManager>
         UpdateSorting();
     }
 
-    private static List<IsoSpriteSorting> sortedSprites = new List<IsoSpriteSorting>(64);
+    private static readonly List<IsoSpriteSorting> sortedSprites = new List<IsoSpriteSorting>(64);
     public static void UpdateSorting()
     {
         FilterListByVisibility(staticSpriteList, currentlyVisibleStaticSpriteList);
@@ -97,52 +110,47 @@ public class IsoSpriteSortingManager : Singleton<IsoSpriteSortingManager>
         ClearMovingDependencies(currentlyVisibleStaticSpriteList);
         ClearMovingDependencies(currentlyVisibleMoveableSpriteList);
 
-        AddMovingDependenciesToStaticSprites(currentlyVisibleMoveableSpriteList, currentlyVisibleStaticSpriteList);
-        AddMovingDependenciesToMovingSprites(currentlyVisibleMoveableSpriteList);
+        AddMovingDependencies(currentlyVisibleMoveableSpriteList, currentlyVisibleStaticSpriteList);
 
         sortedSprites.Clear();
         TopologicalSort.Sort(currentlyVisibleStaticSpriteList, currentlyVisibleMoveableSpriteList, sortedSprites);
         SetSortOrderBasedOnListOrder(sortedSprites);
     }
 
-    private static void AddMovingDependenciesToStaticSprites(List<IsoSpriteSorting> moveableList, List<IsoSpriteSorting> staticList)
+    private static void AddMovingDependencies(List<IsoSpriteSorting> moveableList, List<IsoSpriteSorting> staticList)
     {
-        for (int i = 0; i < moveableList.Count; i++)
+        int moveableCount = moveableList.Count;
+        int staticCount = staticList.Count;
+        for (int i = 0; i < moveableCount; i++)
         {
-            IsoSpriteSorting moveSprite = moveableList[i];
-            for (int j = 0; j < staticList.Count; j++)
+            IsoSpriteSorting moveSprite1 = moveableList[i];
+            //Add Moving Dependencies to static sprites
+            for (int j = 0; j < staticCount; j++)
             {
                 IsoSpriteSorting staticSprite = staticList[j];
-                if (CalculateBoundsIntersection(moveSprite, staticSprite))
+                if (CalculateBoundsIntersection(moveSprite1, staticSprite))
                 {
-                    int compareResult = IsoSpriteSorting.CompareIsoSorters(moveSprite, staticSprite);
+                    int compareResult = IsoSpriteSorting.CompareIsoSorters(moveSprite1, staticSprite);
                     if (compareResult == -1)
                     {
-                        staticSprite.movingDependencies.Add(moveSprite);
+                        staticSprite.movingDependencies.Add(moveSprite1);
                     }
                     else if (compareResult == 1)
                     {
-                        moveSprite.movingDependencies.Add(staticSprite);
+                        moveSprite1.movingDependencies.Add(staticSprite);
                     }
                 }
             }
-        }
-    }
-
-    private static void AddMovingDependenciesToMovingSprites(List<IsoSpriteSorting> moveableList)
-    {
-        for (int i = 0; i < moveableList.Count; i++)
-        {
-            IsoSpriteSorting sprite1 = moveableList[i];
-            for (int j = 0; j < moveableList.Count; j++)
+            //Add Moving Dependencies to Moving Sprites
+            for (int j = 0; j < moveableCount; j++)
             {
-                IsoSpriteSorting sprite2 = moveableList[j];
-                if (CalculateBoundsIntersection(sprite1, sprite2))
+                IsoSpriteSorting moveSprite2 = moveableList[j];
+                if (CalculateBoundsIntersection(moveSprite1, moveSprite2))
                 {
-                    int compareResult = IsoSpriteSorting.CompareIsoSorters(sprite1, sprite2);
+                    int compareResult = IsoSpriteSorting.CompareIsoSorters(moveSprite1, moveSprite2);
                     if (compareResult == -1)
                     {
-                        sprite2.movingDependencies.Add(sprite1);
+                        moveSprite2.movingDependencies.Add(moveSprite1);
                     }
                 }
             }
@@ -151,7 +159,8 @@ public class IsoSpriteSortingManager : Singleton<IsoSpriteSortingManager>
 
     private static void ClearMovingDependencies(List<IsoSpriteSorting> sprites)
     {
-        for (int i = 0; i < sprites.Count; i++)
+        int count = sprites.Count;
+        for (int i = 0; i < count; i++)
         {
             sprites[i].movingDependencies.Clear();
         }
@@ -165,7 +174,8 @@ public class IsoSpriteSortingManager : Singleton<IsoSpriteSortingManager>
     private static void SetSortOrderBasedOnListOrder(List<IsoSpriteSorting> spriteList)
     {
         int orderCurrent = 0;
-        for (int i = 0; i < spriteList.Count; ++i)
+        int count = spriteList.Count;
+        for (int i = 0; i < count; ++i)
         {
             spriteList[i].RendererSortingOrder = orderCurrent;
             orderCurrent += 1;
@@ -184,7 +194,8 @@ public class IsoSpriteSortingManager : Singleton<IsoSpriteSortingManager>
     public static void FilterListByVisibility(List<IsoSpriteSorting> fullList, List<IsoSpriteSorting> destinationList)
     {
         destinationList.Clear();
-        for (int i = 0; i < fullList.Count; i++)
+        int count = fullList.Count;
+        for (int i = 0; i < count; i++)
         {
             IsoSpriteSorting sprite = fullList[i];
             if (sprite.forceSort)

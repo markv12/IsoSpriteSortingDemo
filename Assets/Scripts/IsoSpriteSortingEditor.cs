@@ -11,12 +11,23 @@ public class IsoSpriteSortingEditor : Editor
     {
         IsoSpriteSorting myTarget = (IsoSpriteSorting)target;
 
-        myTarget.SorterPositionOffset = Handles.FreeMoveHandle(myTarget.transform.position + myTarget.SorterPositionOffset, Quaternion.identity, 0.08f * HandleUtility.GetHandleSize(myTarget.transform.position), Vector3.zero, Handles.DotCap) - myTarget.transform.position;
+        myTarget.SorterPositionOffset = Handles.FreeMoveHandle(
+            myTarget.transform.position + myTarget.SorterPositionOffset,
+            Quaternion.identity,
+            0.08f * HandleUtility.GetHandleSize(myTarget.transform.position),
+            Vector3.zero,
+            Handles.DotHandleCap
+        ) - myTarget.transform.position;
         if (myTarget.sortType == IsoSpriteSorting.SortType.Line)
         {
-            myTarget.SorterPositionOffset2 = Handles.FreeMoveHandle(myTarget.transform.position + myTarget.SorterPositionOffset2, Quaternion.identity, 0.08f * HandleUtility.GetHandleSize(myTarget.transform.position), Vector3.zero, Handles.DotCap) - myTarget.transform.position;
+            myTarget.SorterPositionOffset2 = Handles.FreeMoveHandle(
+                myTarget.transform.position + myTarget.SorterPositionOffset2,
+                Quaternion.identity,
+                0.08f * HandleUtility.GetHandleSize(myTarget.transform.position),
+                Vector3.zero,
+                Handles.DotHandleCap
+            ) - myTarget.transform.position;
             Handles.DrawLine(myTarget.transform.position + myTarget.SorterPositionOffset, myTarget.transform.position + myTarget.SorterPositionOffset2);
-
         }
         if (GUI.changed)
         {
