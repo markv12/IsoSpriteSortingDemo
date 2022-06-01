@@ -27,7 +27,6 @@ public class IsoSpriteSortingManager : Singleton<IsoSpriteSortingManager>
                 }
                 else
                 {
-
                     staticSpriteList.Add(newSprite);
                     newSprite.SetupStaticCache();
                     SetupStaticDependencies(newSprite);
@@ -177,7 +176,15 @@ public class IsoSpriteSortingManager : Singleton<IsoSpriteSortingManager>
         int count = spriteList.Count;
         for (int i = 0; i < count; ++i)
         {
-            spriteList[i].RendererSortingOrder = orderCurrent;
+            //
+            if (spriteList[i].useSortingGroup)
+            {
+                spriteList[i].sortingGroup.sortingOrder = orderCurrent;
+            }
+            else
+            {
+                spriteList[i].RendererSortingOrder = orderCurrent;
+            }
             orderCurrent += 1;
         }
     }
@@ -187,7 +194,15 @@ public class IsoSpriteSortingManager : Singleton<IsoSpriteSortingManager>
         int startOrder = -spriteList.Count - 1;
         for (int i = 0; i < spriteList.Count; ++i)
         {
-            spriteList[i].RendererSortingOrder = startOrder + i;
+            if (spriteList[i].useSortingGroup)
+            {
+                spriteList[i].sortingGroup.sortingOrder = startOrder + i;
+            }
+            else
+            {
+                spriteList[i].RendererSortingOrder = startOrder + i;
+            }
+
         }
     }
 
@@ -202,6 +217,10 @@ public class IsoSpriteSortingManager : Singleton<IsoSpriteSortingManager>
             {
                 destinationList.Add(sprite);
                 sprite.forceSort = false;
+            }
+            else if(sprite.useSortingGroup)
+            {
+                destinationList.Add(sprite);
             }
             else
             {
@@ -219,7 +238,7 @@ public class IsoSpriteSortingManager : Singleton<IsoSpriteSortingManager>
 
     private static void SortListSimple(List<IsoSpriteSorting> list)
     {
-        list.Sort((a, b) =>
+        list.Sort((System.Comparison<IsoSpriteSorting>)((a, b) =>
         {
             if (!a || !b)
             {
@@ -229,6 +248,6 @@ public class IsoSpriteSortingManager : Singleton<IsoSpriteSortingManager>
             {
                 return IsoSpriteSorting.CompareIsoSorters(a, b);
             }
-        });
+        }));
     }
 }

@@ -2,6 +2,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
+
 
 public class IsoSpriteSorting : MonoBehaviour
 {
@@ -55,6 +57,8 @@ public class IsoSpriteSorting : MonoBehaviour
     public Vector3 SorterPositionOffset = new Vector3();
     public Vector3 SorterPositionOffset2 = new Vector3();
     public Renderer[] renderersToSort;
+    public bool useSortingGroup;
+    public SortingGroup sortingGroup;
 
     private Transform t;
 
@@ -67,6 +71,7 @@ public class IsoSpriteSorting : MonoBehaviour
 
     private void RefreshBounds()
     {
+
         cachedBounds = new Bounds2D(renderersToSort[0].bounds);
     }
 
@@ -180,9 +185,17 @@ public class IsoSpriteSorting : MonoBehaviour
     private void Setup()
     {
         t = transform;  //This needs to be here AND in the Awake function
-        if (renderersToSort == null || renderersToSort.Length == 0)
+        if (useSortingGroup)
         {
-            renderersToSort = GetComponentsInChildren<Renderer>();
+            sortingGroup = GetComponent<SortingGroup>();
+        }
+        else
+        {
+            if (renderersToSort == null || renderersToSort.Length == 0)
+            {
+                //SortingGroup groupsToSort = GetComponent<SortingGroup>();
+                renderersToSort = GetComponentsInChildren<Renderer>();
+            }
         }
         IsoSpriteSortingManager.RegisterSprite(this);
     }
