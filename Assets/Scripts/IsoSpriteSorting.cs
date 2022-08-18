@@ -67,7 +67,11 @@ public class IsoSpriteSorting : MonoBehaviour
 
     private void RefreshBounds()
     {
-        cachedBounds = new Bounds2D(renderersToSort[0].bounds);
+        Bounds groupBounds = renderersToSort[0].bounds;
+        foreach (Renderer childRenderer in renderersToSort) {
+            groupBounds.Encapsulate(childRenderer.bounds);
+        }
+        cachedBounds = new Bounds2D(groupBounds);
     }
 
     private void RefreshPoint1()
