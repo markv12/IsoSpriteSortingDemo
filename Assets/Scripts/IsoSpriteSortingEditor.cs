@@ -5,43 +5,37 @@ using UnityEngine;
 #pragma warning disable 618
 
 [CustomEditor(typeof(IsoSpriteSorting))]
-public class IsoSpriteSortingEditor : Editor
-{
-    public void OnSceneGUI()
-    {
+public class IsoSpriteSortingEditor : Editor {
+    public void OnSceneGUI() {
         IsoSpriteSorting myTarget = (IsoSpriteSorting)target;
 
         myTarget.SorterPositionOffset = Handles.FreeMoveHandle(
-            myTarget.transform.position + myTarget.SorterPositionOffset,
+            myTarget.transform.position + (Vector3)myTarget.SorterPositionOffset,
             Quaternion.identity,
             0.08f * HandleUtility.GetHandleSize(myTarget.transform.position),
             Vector3.zero,
             Handles.DotHandleCap
         ) - myTarget.transform.position;
-        if (myTarget.sortType == IsoSpriteSorting.SortType.Line)
-        {
+        if (myTarget.sortType == IsoSpriteSorting.SortType.Line) {
             myTarget.SorterPositionOffset2 = Handles.FreeMoveHandle(
-                myTarget.transform.position + myTarget.SorterPositionOffset2,
+                myTarget.transform.position + (Vector3)myTarget.SorterPositionOffset2,
                 Quaternion.identity,
                 0.08f * HandleUtility.GetHandleSize(myTarget.transform.position),
                 Vector3.zero,
                 Handles.DotHandleCap
             ) - myTarget.transform.position;
-            Handles.DrawLine(myTarget.transform.position + myTarget.SorterPositionOffset, myTarget.transform.position + myTarget.SorterPositionOffset2);
+            Handles.DrawLine(myTarget.transform.position + (Vector3)myTarget.SorterPositionOffset, myTarget.transform.position + (Vector3)myTarget.SorterPositionOffset2);
         }
-        if (GUI.changed)
-        {
+        if (GUI.changed) {
             Undo.RecordObject(target, "Updated Sorting Offset");
             EditorUtility.SetDirty(target);
         }
     }
 
-    public override void OnInspectorGUI()
-    {
+    public override void OnInspectorGUI() {
         DrawDefaultInspector();
         IsoSpriteSorting myScript = (IsoSpriteSorting)target;
-        if (GUILayout.Button("Sort Visible Scene"))
-        {
+        if (GUILayout.Button("Sort Visible Scene")) {
             myScript.SortScene();
         }
     }
