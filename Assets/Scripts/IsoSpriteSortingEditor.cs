@@ -6,30 +6,37 @@ using UnityEngine;
 
 [CustomEditor(typeof(IsoSpriteSorting))]
 public class IsoSpriteSortingEditor : Editor {
-    public void OnSceneGUI() {
-        IsoSpriteSorting myTarget = (IsoSpriteSorting)target;
+    SerializedProperty sorterPositionOffset;
+    SerializedProperty sorterPositionOffset2;
 
-        myTarget.SorterPositionOffset = Handles.FreeMoveHandle(
-            myTarget.transform.position + (Vector3)myTarget.SorterPositionOffset,
+    private void OnEnable() {
+        sorterPositionOffset = serializedObject.FindProperty("SorterPositionOffset");
+        sorterPositionOffset2 = serializedObject.FindProperty("SorterPositionOffset2");
+    }
+
+    public void OnSceneGUI() {
+        IsoSpriteSorting sorter = (IsoSpriteSorting)target;
+
+        serializedObject.Update();
+        sorterPositionOffset.vector2Value = Handles.FreeMoveHandle(
+            sorter.transform.position + (Vector3)sorterPositionOffset.vector2Value,
             Quaternion.identity,
-            0.08f * HandleUtility.GetHandleSize(myTarget.transform.position),
+            0.08f * HandleUtility.GetHandleSize(sorter.transform.position),
             Vector3.zero,
             Handles.DotHandleCap
-        ) - myTarget.transform.position;
-        if (myTarget.sortType == IsoSpriteSorting.SortType.Line) {
-            myTarget.SorterPositionOffset2 = Handles.FreeMoveHandle(
-                myTarget.transform.position + (Vector3)myTarget.SorterPositionOffset2,
+        ) - sorter.transform.position;
+        if (sorter.sortType == IsoSpriteSorting.SortType.Line) {
+            sorterPositionOffset2.vector2Value = Handles.FreeMoveHandle(
+                sorter.transform.position + (Vector3)sorterPositionOffset2.vector2Value,
                 Quaternion.identity,
-                0.08f * HandleUtility.GetHandleSize(myTarget.transform.position),
+                0.08f * HandleUtility.GetHandleSize(sorter.transform.position),
                 Vector3.zero,
                 Handles.DotHandleCap
-            ) - myTarget.transform.position;
-            Handles.DrawLine(myTarget.transform.position + (Vector3)myTarget.SorterPositionOffset, myTarget.transform.position + (Vector3)myTarget.SorterPositionOffset2);
+            ) - sorter.transform.position;
+            Vector2 pos = sorter.transform.position;
+            Handles.DrawLine(pos + sorterPositionOffset.vector2Value, pos + sorterPositionOffset2.vector2Value);
         }
-        if (GUI.changed) {
-            Undo.RecordObject(target, "Updated Sorting Offset");
-            EditorUtility.SetDirty(target);
-        }
+        serializedObject.ApplyModifiedProperties();
     }
 
     public override void OnInspectorGUI() {
